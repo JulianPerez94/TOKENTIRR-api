@@ -1,0 +1,63 @@
+version: '3.3'
+
+volumes:
+  tokentirr_database: {}
+  tokentirr_database_backups: {}
+
+services:
+  tokentirr-backend:
+    image: registry.dekaside.com/tokentirr/tokentirr-backend:latest
+    command: yarn start
+    depends_on:
+      - tokentirr-postgres
+    env_file:
+      - ./.env.backend
+    networks:
+      - tokentirr
+
+  tokentirr-postgres:
+    image: registry.dekaside.com/library/postgres:13
+    deploy:
+      placement:
+        constraints:
+          - node.hostname == node03.staging.dekaside.com
+    networks:
+      - tokentirr
+    volumes:
+      - tokentirr_db:/var/lib/postgresql/data
+      - tokentirr_db_backups:/backups
+    env_file:
+      - ./.env.backend
+
+  tokentirr-backend-proxy:
+    image: registry.dekaside.com/library/nginx:latest
+    environment:
+      - NGINX_UPSTREAM_APP=app
+      - NGINX_UPSTREAM_SERVER=tokentirr-backend
+      - NGINX_UPSTREAM_PORT=8000
+      - NGINX_PORT=80
+      - NGINX_HOST=tokentirr.staging.dekaside.com
+      - NGINX_MAX_BODY_SIZE=500M
+    depends_on:
+      - tokentirr-backend
+    networks:
+      - traefik-public
+      - tokentirr
+    deploy:
+      labels:
+        - traefik.enable=true
+        - traefik.docker.network=traefik-public
+        - traefik.constraint-label=traefik-public
+        - traefik.http.routers.tokentirr-http.rule=Host(`tokentirr.staging.dekaside.com`)
+        - traefik.http.routers.tokentirr-http.entrypoints=http
+        - traefik.http.routers.tokentirr-http.middlewares=https-redirect
+        - traefik.http.routers.tokentirr-https.rule=Host(`tokentirr.staging.dekaside.com`)
+        - traefik.http.routers.tokentirr-https.entrypoints=https
+        - traefik.http.routers.tokentirr-https.tls=true
+        - traefik.http.routers.tokentirr-https.tls.certresolver=le
+        - traefik.http.services.tokentirr-https.loadbalancer.server.port=80
+
+networks:
+  traefik-public:
+    external: true
+  tokentirr:
