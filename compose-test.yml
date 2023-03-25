@@ -1,0 +1,27 @@
+version: '3.3'
+
+services:
+  postgres-tokentirr-test:
+    image: postgres:14.4
+    container_name: postgres-tokentirr-test
+    ports:
+      - '5437:5437'
+    expose:
+      - '5437'
+    restart: unless-stopped
+    volumes:
+      - ./databases/postgres/:/var/lib/postgresql/data
+    environment:
+      - POSTGRES_USER=tokentirr
+      - POSTGRES_PASSWORD=tokentirr
+      - POSTGRES_DB=tokentirrdb
+      - POSTGRES_PORT=5437
+    networks:
+      - nginxproxy_net3
+    command:
+      - '-p 5437'
+
+networks:
+  nginxproxy_net3:
+    external:
+      name: nginxproxy_net3
